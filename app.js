@@ -3,7 +3,7 @@ const cors = require('cors');
 const Groq = require('groq-sdk');
 
 const app = express();
-app.use(cors());
+app.use(cors()); // Permette le chiamate da Netlify
 app.use(express.json());
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -11,35 +11,30 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 app.post('/api/generate-chapter', async (req, res) => {
   try {
     const { prompt, maxWords, context } = req.body;
-
-    const systemMessage = `Sei un assistente per la scrittura creativa. 
-Titolo libro: ${context?.title || 'Senza titolo'}
-POV: ${context?.pov || 'Terza persona'}
-Tono: ${context?.tone || 'Neutro'}
-Trama generale: ${context?.generalPlot || 'N/A'}`;
-
-    const userMessage = `Scrivi un capitolo di circa ${maxWords || 500} parole basandoti su questa bozza/prompt:
-${prompt}`;
-
+    
     const completion = await groq.chat.completions.create({
       messages: [
-        { role: 'system', content: systemMessage },
-        { role: 'user', content: userMessage }
+        {
+          role: 'system',
+          content: `Sei uno scrittore esperto. Scrivi in lingua italiana basandoti su questo contesto: Stile=${context?.tone || 'narrativo'}, POV=${context?.pov || 'prima persona'}.`
+        },
+        {
+          role: 'user',
+          content: `Scrivi un capitolo di circa ${maxWords || 1000} parole basato su questa trama: ${prompt}`
+        }
       ],
       model: 'llama-3.3-70b-versatile',
-      temperature: 0.7,
-      max_completion_tokens: 2048,
     });
 
-    const text = completion.choices[0]?.message?.content || '';
-    res.json({ text });
+    const generatedText = completion.choices[0]?.message?.content || "Nessun testo generato.";
+    res.json({ text: generatedText });
   } catch (error) {
-    console.error('Errore durante la generazione:', error);
-    res.status(500).json({ error: 'Errore interno del server' });
+    console.error("Errore Groq:", error);
+    res.status(500).json({ error: "Errore durante la generazione con Groq." });
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`Server mich in ascolto sulla porta ${PORT}`);
+  console.log(`Server attivo sulla porta ${PORT}`);
 });
